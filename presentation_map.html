@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where I've Presented</title>
+<style>
+  :root { --sea: #0f2236; --land: #3e6176; --line: #0f2236; --pin: #f2b134; --ink: #f4efe6; }
+  html, body { height: 100%; margin: 0; background: var(--sea); color: var(--ink);
+    font-family: "Trebuchet MS", "Gill Sans", sans-serif; overflow: hidden; }
+  svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  svg:active { cursor: grabbing; }
+  .sphere { fill: var(--sea); }
+  .grid { fill: none; stroke: #ffffff; stroke-opacity: .06; stroke-width: .5; }
+  .land { fill: var(--land); stroke: var(--line); stroke-width: .5; }
+
+  .pin { cursor: pointer; }
+  .pin .dot { fill: var(--pin); stroke: var(--sea); stroke-width: 2; transition: r .15s; }
+  .pin .ring { fill: none; stroke: var(--pin); stroke-width: 2; opacity: 0; }
+  .pin:hover .dot, .pin:focus .dot { stroke: #fff; }
+  .pin .count { fill: var(--sea); font: bold 11px sans-serif; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  .pin:focus { outline: none; }
+  .pin.active .ring { opacity: 1; animation: pulse 1.6s ease-out infinite; }
+  @keyframes pulse { from { r: 8; opacity: .9; } to { r: 24; opacity: 0; } }
+
+  .heading { position: absolute; top: 20px; left: 24px; font-size: 1.3rem; letter-spacing: .02em; }
+  .hint { position: absolute; bottom: 18px; left: 24px; font-size: .85rem; opacity: .6; }
+
+  #card {
+    position: absolute; right: 24px; bottom: 24px; width: min(320px, calc(100% - 48px));
+    background: var(--ink); color: var(--sea); border-radius: 10px; padding: 18px 20px;
+    transform: translateY(20px); opacity: 0; pointer-events: none;
+    transition: transform .2s ease, opacity .2s ease;
+  }
+  #card.show { transform: none; opacity: 1; pointer-events: auto; }
+  #card h2 { margin: 0 0 4px; font-size: 1.25rem; line-height: 1.25; }
+  #card p { margin: 0; font-size: .9rem; color: #4a5d70; }
+  #c-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 200px; overflow-y: auto; }
+  #c-list li { padding: 7px 0; border-top: 1px solid #cfd6dd; }
+  #c-list b { display: block; font-size: 1rem; }
+  #c-list span { font-size: .85rem; color: #4a5d70; }
+  #close { position: absolute; top: 8px; right: 12px; background: none; border: 0;
+    font-size: 1.4rem; line-height: 1; cursor: pointer; color: #4a5d70; }
+  @media (prefers-reduced-motion: reduce) { .pin.active .ring { animation: none; } #card { transition: none; } }
+</style>
+</head>
+<body>
+<div class="heading">Where I've presented</div>
+<div class="hint">Drag to pan, scroll to zoom, click or hover for info.</div>
+<svg id="map" role="img" aria-label="World map with conference locations"></svg>
+
+<div id="card" role="status" aria-live="polite">
+  <button id="close" aria-label="Close">&times;</button>
+  <h2 id="c-name"></h2>
+  <p id="c-meta"></p>
+  <ul id="c-list"></ul>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script>
+  // ============ EDIT YOUR LOCATIONS HERE ============
+  // lat/lng: right-click a spot in Google Maps to copy its coordinates.
+  const conferences = [
+    { name: "Aerodyne Research Seminar Series", city: "Billerica, Massachusetts",      lat: 42.558333,  lng: -71.269444, date: "April 2023" },
+    { name: "Geological Society of Washington",     city: "Washington, District of Columbia",         lat: 38.9115127,  lng: -77.0476751, date: "September 2019" },
+    { name: "Ocean Sciences Meeting",  city: "Glasgow, Scotland",          lat: 55.861111,  lng: -4.25, date: "February 2026" },
+    { name: "American Geophysical Union Fall Meeting",      city: "New Orleans, Louisiana", lat: 29.9761, lng: -90.0783,  date: "December 2025" },
+    { name: "Field Laser Applications in Industry and Research Conference",      city: "Assisi, Italy", lat: 43.075833, lng: 12.6175,  date: "September 2024" },
+    { name: "Ninth International Clumped Isotope Workshop",      city: "Stony Brook, New York", lat: 40.906389, lng: -73.128333,  date: "August 2024" },
+    { name: "Conference on Lasers and Electro-Optics",      city: "San Jose, California", lat: 37.336111, lng: -121.890556,  date: "May 2023" },
+    { name: "Eighth International Clumped Isotope Workshop",      city: "Jerusalem, Israel", lat: 31.778889, lng: 35.225556,  date: "September 2022" },
+    { name: "American Geophysical Union Fall Meeting",      city: "New Orleans, Louisiana", lat: 29.9761, lng: -90.0783,  date: "December 2021" },
+    { name: "51<sup>st</sup> Lunar and Planetary Science Conference",      city: "The Woodlands, Texas", lat: 30.162778, lng: -95.461389,  date: "March 2020" },
+    { name: "Harsh Environments Mass Spectrometry Workshop",      city: "Myrtle Beach, South Carolina", lat: 33.730278, lng: -78.869722,  date: "September 2019" },
+    { name: "Advances in Stable Isotope Techniques and Applications Workshop",      city: "Winnipeg, Manitoba", lat: 49.895556, lng: -97.138611,  date: "June 2019" },
+    { name: "Geological Society of America Northeastern Section Meeting",      city: "Portland, Maine", lat: 43.647222, lng: -70.171667,  date: "March 2019" },
+    { name: "Advances in Stable Isotope Techniques and Applications Workshop",      city: "Washington, District of Columbia", lat: 38.9115127,  lng: -77.0476751,  date: "June 2018" },
+    { name: "Geological Society of America Northeastern Section Meeting",      city: "Bretton Woods, New Hampshire", lat: 44.258056, lng: -71.441111,  date: "March 2015" }
+  ];
+  // ===================================================
+
+  const W = 1000, H = 520;
+  const svg = d3.select("#map").attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
+  const world = svg.append("g");
+  const projection = d3.geoNaturalEarth1().fitExtent([[10, 40], [W - 10, H - 10]], { type: "Sphere" });
+  const path = d3.geoPath(projection);
+
+  world.append("path").datum({ type: "Sphere" }).attr("class", "sphere").attr("d", path);
+  world.append("path").datum(d3.geoGraticule10()).attr("class", "grid").attr("d", path);
+
+  const card = d3.select("#card");
+  const pinsLayer = world.append("g");
+  let pins;
+
+  const plain = t => String(t).replace(/<[^>]*>/g, "");   // strips tags like <sup> for tooltips
+
+  function select(place, el) {
+    pins.classed("active", false);
+    d3.select(el).classed("active", true);
+    const items = place.items, list = d3.select("#c-list").html("");
+    if (items.length === 1) {
+      d3.select("#c-name").html(items[0].name);
+      d3.select("#c-meta").text(`${items[0].city} \u00b7 ${items[0].date}`);
+    } else {
+      d3.select("#c-name").text(items[0].city);
+      d3.select("#c-meta").text(`${items.length} conferences`);
+      const li = list.selectAll("li").data(items).join("li");
+      li.append("b").html(d => d.name);
+      li.append("span").text(d => d.date);
+    }
+    card.classed("show", true);
+  }
+  function clear() { pins.classed("active", false); card.classed("show", false); }
+  d3.select("#close").on("click", clear);
+  svg.on("click", e => { if (!e.target.closest(".pin")) clear(); });
+
+  // Pins
+  // Group conferences that share the same coordinates into one pin
+  const grouped = {};
+  conferences.forEach(c => {
+    const key = Number(c.lat).toFixed(4) + "," + Number(c.lng).toFixed(4);
+    (grouped[key] = grouped[key] || { lat: c.lat, lng: c.lng, items: [] }).items.push(c);
+  });
+  const places = Object.values(grouped);
+
+  pins = pinsLayer.selectAll("g").data(places).join("g")
+    .attr("class", "pin").attr("tabindex", 0).attr("role", "button")
+    .attr("aria-label", d => d.items.map(c => plain(c.name)).join(", "))
+    .attr("transform", d => `translate(${projection([d.lng, d.lat])})`)
+    .on("click", function (e, d) { e.stopPropagation(); select(d, this); })
+    .on("keydown", function (e, d) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(d, this); } });
+  pins.append("circle").attr("class", "ring").attr("r", 8);
+  pins.append("circle").attr("class", "dot").attr("r", d => d.items.length > 1 ? 10 : 6);
+  pins.filter(d => d.items.length > 1).append("text").attr("class", "count").text(d => d.items.length);
+  pins.append("title").text(d => d.items.map(c => plain(c.name)).join("; "));
+
+  // Zoom & pan (pins keep a constant size)
+  svg.call(d3.zoom().scaleExtent([1, 10]).on("zoom", e => {
+    world.attr("transform", e.transform);
+    pins.attr("transform", d => `translate(${projection([d.lng, d.lat])}) scale(${1 / e.transform.k})`);
+  }));
+
+  // Countries
+  fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json")
+    .then(r => r.json())
+    .then(topo => {
+      world.insert("g", () => pinsLayer.node()).selectAll("path")
+        .data(topojson.feature(topo, topo.objects.countries).features)
+        .join("path").attr("class", "land").attr("d", path);
+    })
+    .catch(() => console.error("Could not load map data. Check your internet connection."));
+</script>
+</body>
+</html>
